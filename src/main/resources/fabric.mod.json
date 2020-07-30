@@ -1,37 +1,28 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "raisesoundlimit",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "RaiseSoundLimit",
+  "description": "Raise sound pool size",
   "authors": [
-    "Me!"
+    "ishland"
   ],
-  "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
-  },
 
-  "license": "CC0-1.0",
-  "icon": "assets/modid/icon.png",
+  "license": "Apache-2.0",
 
-  "environment": "*",
+  "environment": "client",
   "entrypoints": {
     "main": [
-      "net.fabricmc.example.ExampleMod"
+      "com.ishland.fabric.raisesoundlimit.FabricLoader"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "raisesoundlimit.mixins.json"
   ],
 
   "depends": {
     "fabricloader": ">=0.7.4",
-    "fabric": "*",
     "minecraft": "1.16.x"
-  },
-  "suggests": {
-    "flamingo": "*"
   }
 }
