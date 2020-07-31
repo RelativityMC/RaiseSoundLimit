@@ -4,4 +4,6 @@ public interface ISourceSetImpl {
 
     void setMaxSourceCount(int maxSourceCount);
 
+    int getMaxSourceCount();
+
 }
