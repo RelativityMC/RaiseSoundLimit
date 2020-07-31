@@ -6,7 +6,8 @@
   "mixins": [
     "MixinSoundEngine",
     "MixinSource",
-    "MixinSourceSetImpl"
+    "MixinSourceSetImpl",
+    "MixinStaticSound"
   ],
   "injectors": {
     "defaultRequire": 1

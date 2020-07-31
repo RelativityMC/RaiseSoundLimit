@@ -35,7 +35,8 @@ public class MixinSoundEngine {
 
     @Inject(
             method = "getDebugString",
-            at = @At("TAIL")
+            at = @At("TAIL"),
+            cancellable = true
     )
     public void onPostGetDebugString(CallbackInfoReturnable<String> cir) {
         cir.setReturnValue(
