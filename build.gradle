@@ -1,6 +1,9 @@
+import net.fabricmc.loom.task.RemapJarTask
+
 plugins {
 	id 'fabric-loom' version '0.4-SNAPSHOT'
 	id 'maven-publish'
+	id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 sourceCompatibility = JavaVersion.VERSION_1_8
@@ -16,11 +19,15 @@ dependencies {
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
+	// https://mvnrepository.com/artifact/org.apache.commons/commons-pool2
+	compile group: 'org.apache.commons', name: 'commons-pool2', version: '2.8.1'
+
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	// modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
 	// PSA: Some older mods, compiled on Loom 0.2.1, might have outdated Maven POMs.
 	// You may need to force-disable transitiveness on them.
+
 }
 
 processResources {
@@ -75,3 +82,42 @@ publishing {
 		// mavenLocal()
 	}
 }
+
+shadowJar {
+	archiveClassifier = "all-dev"
+	dependencies {
+		exclude(dependency('com.mojang::'))
+		exclude(dependency('net.fabricmc::'))
+		exclude(dependency('net.fabricmc.fabric-api::'))
+		exclude(dependency('net.minecraft::'))
+		exclude(dependency('oshi-project::'))
+		exclude(dependency('com.ibm.icu::'))
+		exclude(dependency('net.java.dev.jna::'))
+		exclude(dependency('net.sf.jopt-simple::'))
+		exclude(dependency('io.netty::'))
+		exclude(dependency('com.google.guava::'))
+		exclude(dependency('org.apache.commons:commons-lang3:'))
+		exclude(dependency('org.apache.commons:commons-compress:'))
+		exclude(dependency('commons-io::'))
+		exclude(dependency('commons-codec::'))
+		exclude(dependency('net.java.jinput::'))
+		exclude(dependency('net.java.jutils::'))
+		exclude(dependency('com.google.code.gson::'))
+		exclude(dependency('org.apache.httpcomponents:httpclient:'))
+		exclude(dependency('org.apache.httpcomponents:httpcore:'))
+		exclude(dependency('commons-logging::'))
+		exclude(dependency('it.unimi.dsi::'))
+		exclude(dependency('org.apache.logging.log4j::'))
+		exclude(dependency('org.lwjgl::'))
+		exclude(dependency('com.google.jimfs::'))
+		exclude(dependency('org.ow2.asm::'))
+	}
+}
+
+task("remapShadowJar", type: RemapJarTask, dependsOn: shadowJar) {
+	input = shadowJar.archiveFile
+	archiveFileName = shadowJar.archiveFileName.get().replaceAll("-dev\\.jar\$", ".jar")
+	addNestedDependencies = false
+}
+
+assemble.dependsOn(remapShadowJar)

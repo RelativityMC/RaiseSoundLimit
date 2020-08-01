@@ -4,10 +4,14 @@
   "package": "com.ishland.fabric.raisesoundlimit.mixin",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
+    "MixinChannel",
+    "MixinClientMain",
+    "MixinDebugHud",
     "MixinSoundEngine",
-    "MixinSource",
-    "MixinSourceSetImpl",
-    "MixinStaticSound"
+    "MixinSoundEngineSourceSetImpl",
+    "MixinSoundExecutor",
+    "MixinSoundManager",
+    "MixinSoundSystem"
   ],
   "injectors": {
     "defaultRequire": 1

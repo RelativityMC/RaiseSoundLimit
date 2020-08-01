@@ -1,49 +1,65 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
-import com.ishland.fabric.raisesoundlimit.FabricLoader;
-import com.ishland.fabric.raisesoundlimit.MixinLogger;
-import com.ishland.fabric.raisesoundlimit.PoolingOpenALContext;
-import com.ishland.fabric.raisesoundlimit.mixininterface.ISourceSetImpl;
+import com.ishland.fabric.raisesoundlimit.MixinUtils;
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngineSourceSetImpl;
+import com.ishland.fabric.raisesoundlimit.sound.SourceSetUsage;
 import net.minecraft.client.sound.SoundEngine;
+import org.lwjgl.openal.ALC;
+import org.lwjgl.openal.ALC10;
+import org.lwjgl.openal.EXTThreadLocalContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
+import java.util.LinkedList;
+import java.util.List;
 
 @Mixin(SoundEngine.class)
-public class MixinSoundEngine {
+public class MixinSoundEngine implements ISoundEngine {
 
-    @Inject(
-            method = "init",
-            at = @At("TAIL")
-    )
-    public void onPostInit(CallbackInfo ci) throws IllegalAccessException {
-        for (Field field : getClass().getDeclaredFields()) {
-            field.setAccessible(true);
-            Object object = field.get(this);
-            if (object instanceof ISourceSetImpl) {
-                final int currentMax = ((ISourceSetImpl) object).getMaxSourceCount();
-                MixinLogger.logger.info("Altering " + field.getName() +
-                        " from " + currentMax + " to " + currentMax * FabricLoader.modifier);
-                ((ISourceSetImpl) object).setMaxSourceCount(currentMax * FabricLoader.modifier);
+    @Override
+    public SourceSetUsage[] getUsages() {
+        List<SourceSetUsage> list = new LinkedList<>();
+        int i = 0;
+        for(Field field: getClass().getDeclaredFields()){
+            try {
+                field.getType().asSubclass(ISoundEngineSourceSetImpl.class);
+                field.setAccessible(true);
+                ISoundEngineSourceSetImpl sourceSet = (ISoundEngineSourceSetImpl) field.get(this);
+                list.add(new SourceSetUsage(sourceSet.impl$getSourceCount(), sourceSet.impl$getMaxSourceCount()));
+                i ++;
+            } catch (ClassCastException | IllegalAccessException ignored){
             }
         }
+        SourceSetUsage[] usages = new SourceSetUsage[list.size()];
+        return list.toArray(usages);
+    }
+
+    @Redirect(
+            method = "init",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lorg/lwjgl/openal/ALC10;alcMakeContextCurrent(J)Z"
+            )
+    )
+    public boolean onAlcMakeContextCurrent(long context){
+        MixinUtils.logger.info("Redirecting alcMakeContextCurrent to alcSetThreadContext");
+        return EXTThreadLocalContext.alcSetThreadContext(context);
     }
 
     @Inject(
-            method = "getDebugString",
-            at = @At("TAIL"),
-            cancellable = true
+            method = "close",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lorg/lwjgl/openal/ALC10;alcDestroyContext(J)V"
+            )
     )
-    public void onPostGetDebugString(CallbackInfoReturnable<String> cir) {
-        cir.setReturnValue(
-                cir.getReturnValue() +
-                        String.format(" (%d OpenALContexts available)",
-                                PoolingOpenALContext.getInstance().getAvailableCount())
-        );
+    public void onBeforeAlcDestroyContext(CallbackInfo ci){
+        EXTThreadLocalContext.alcSetThreadContext(0);
     }
 
 }
