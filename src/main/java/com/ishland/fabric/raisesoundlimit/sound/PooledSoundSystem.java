@@ -19,10 +19,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -45,6 +42,10 @@ public class PooledSoundSystem extends SoundSystem {
     private final SoundManager loader;
     private final GameOptions settings;
     private final ResourceManager resourceManager;
+
+    private final Executor taskQueue = runnable -> soundSystemForEach(soundSystem -> {
+        ((ISoundSystem) soundSystem).getTaskQueue().execute(runnable);
+    });
 
     // Executors and pools
     private final GenericObjectPool<SoundSystem> pool;
@@ -75,6 +76,7 @@ public class PooledSoundSystem extends SoundSystem {
         pool.setMinIdle(Runtime.getRuntime().availableProcessors());
         pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 8);
         pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 8);
+        pool.setLifo(false);
     }
 
     @Override
@@ -227,16 +229,16 @@ public class PooledSoundSystem extends SoundSystem {
         if (Math.abs(lastFetchTime - System.currentTimeMillis()) > 10 * 1000)
             debugString = calculatingDebugString;
         internalExecutor.execute(() -> {
-            List<SourceSetUsage[]> list = new LinkedList<>();
+            List<List<SourceSetUsage>> list = new LinkedList<>();
             soundSystemForEach(soundSystem ->
                     list.add(((ISoundEngine) ((ISoundSystem) soundSystem).getSoundEngine()).getUsages()));
-            int[] used = new int[list.get(0).length];
-            int[] max = new int[list.get(0).length];
+            int[] used = new int[list.get(0).size()];
+            int[] max = new int[list.get(0).size()];
             list.forEach(sourceSetUsages -> {
-                for (int i = 0, sourceSetUsagesLength = sourceSetUsages.length; i < sourceSetUsagesLength; i++) {
-                    SourceSetUsage usage = sourceSetUsages[i];
-                    used[i] = usage.getUsed();
-                    max[i] = usage.getMax();
+                for (int i = 0, sourceSetUsagesLength = sourceSetUsages.size(); i < sourceSetUsagesLength; i++) {
+                    SourceSetUsage usage = sourceSetUsages.get(i);
+                    used[i] += usage.getUsed();
+                    max[i] += usage.getMax();
                 }
             });
             StringBuilder builder = new StringBuilder();
@@ -245,9 +247,10 @@ public class PooledSoundSystem extends SoundSystem {
                 if (i + 1 < length)
                     builder.append(" + ");
             }
+            debugString = builder.toString();
         });
         lastFetchTime = System.currentTimeMillis();
-        return debugString; // For performance, reflection is expensive
+        return "Sound: " + debugString; // For performance, reflection is expensive
     }
 
     public List<String> getRightDebugString() {

@@ -5,8 +5,6 @@ import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngineSourceSetImpl;
 import com.ishland.fabric.raisesoundlimit.sound.SourceSetUsage;
 import net.minecraft.client.sound.SoundEngine;
-import org.lwjgl.openal.ALC;
-import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.EXTThreadLocalContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -22,12 +22,11 @@ import java.util.List;
 public class MixinSoundEngine implements ISoundEngine {
 
     @Override
-    public SourceSetUsage[] getUsages() {
+    public List<SourceSetUsage> getUsages() {
         List<SourceSetUsage> list = new LinkedList<>();
         int i = 0;
         for(Field field: getClass().getDeclaredFields()){
             try {
-                field.getType().asSubclass(ISoundEngineSourceSetImpl.class);
                 field.setAccessible(true);
                 ISoundEngineSourceSetImpl sourceSet = (ISoundEngineSourceSetImpl) field.get(this);
                 list.add(new SourceSetUsage(sourceSet.impl$getSourceCount(), sourceSet.impl$getMaxSourceCount()));
@@ -35,8 +34,7 @@ public class MixinSoundEngine implements ISoundEngine {
             } catch (ClassCastException | IllegalAccessException ignored){
             }
         }
-        SourceSetUsage[] usages = new SourceSetUsage[list.size()];
-        return list.toArray(usages);
+        return Collections.unmodifiableList(list);
     }
 
     @Redirect(

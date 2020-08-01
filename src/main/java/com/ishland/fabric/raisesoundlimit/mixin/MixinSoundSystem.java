@@ -102,4 +102,8 @@ public abstract class MixinSoundSystem implements ISoundSystem {
     @Override
     public abstract SoundEngine getSoundEngine();
 
+    @Accessor
+    @Override
+    public abstract SoundExecutor getTaskQueue();
+
 }
