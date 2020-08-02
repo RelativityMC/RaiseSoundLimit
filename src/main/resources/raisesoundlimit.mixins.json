@@ -12,7 +12,8 @@
     "MixinSoundEngineSourceSetImpl",
     "MixinSoundExecutor",
     "MixinSoundManager",
-    "MixinSoundSystem"
+    "MixinSoundSystem",
+    "MixinSubtitlesHud"
   ],
   "injectors": {
     "defaultRequire": 1
