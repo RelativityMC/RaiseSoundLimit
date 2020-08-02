@@ -31,7 +31,7 @@ public abstract class MixinSoundEngineSourceSetImpl implements ISoundEngineSourc
     }
 
     @Inject(
-            method = "createSource",
+            method = "createSource()Lnet/minecraft/client/sound/Source;",
             at = @At(
                     value = "RETURN"
             )

@@ -56,8 +56,18 @@ public class MixinSoundEngine implements ISoundEngine {
                     target = "Lorg/lwjgl/openal/ALC10;alcDestroyContext(J)V"
             )
     )
-    public void onBeforeAlcDestroyContext(CallbackInfo ci){
+    public void onBeforeAlcDestroyContext(CallbackInfo ci) {
         EXTThreadLocalContext.alcSetThreadContext(0);
+    }
+
+    @Inject(
+            method = "close",
+            at = @At(
+                    value = "TAIL"
+            )
+    )
+    public void onPostClose(CallbackInfo ci) {
+        MixinUtils.logger.info("Sound engine closed.");
     }
 
 }

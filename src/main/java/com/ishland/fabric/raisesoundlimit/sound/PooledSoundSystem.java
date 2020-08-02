@@ -6,11 +6,13 @@ import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.options.GameOptions;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.sound.*;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.text.LiteralText;
 import net.minecraft.util.Identifier;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -60,6 +62,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     private long lastFetchTime = 0L;
     private String debugString = calculatingDebugString;
+    private final AtomicBoolean isResourceLoaded = new AtomicBoolean(false);
 
     public PooledSoundSystem(SoundManager loader, GameOptions settings, ResourceManager resourceManager) throws Exception {
         super(loader, settings, resourceManager);
@@ -75,14 +78,26 @@ public class PooledSoundSystem extends SoundSystem {
 
     public void tryExtendSize() throws Exception {
         if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
-            FabricLoader.logger.info("Trying to extend size of allocated sound system");
+            FabricLoader.logger.info("Stopping sounds and extending size of sound system");
+            MinecraftClient.getInstance().execute(() ->
+                    MinecraftClient.getInstance().inGameHud.setOverlayMessage(
+                            new LiteralText("Stopping sounds and extending size of sound system"),
+                            false
+                    ));
+            stopAll();
             pool.addObject();
         }
     }
 
     @Override
     public void reloadSounds() {
-        soundSystemForEach(SoundSystem::reloadSounds, true);
+        pool.clear();
+        try {
+            pool.preparePool();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        isResourceLoaded.set(true);
     }
 
     @Override
@@ -118,6 +133,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void tick(boolean bl) {
+        if (!isResourceLoaded.get()) return;
         internalExecutor.execute(() -> {
             try {
                 pool.preparePool();
