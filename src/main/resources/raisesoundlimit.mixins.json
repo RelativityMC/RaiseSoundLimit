@@ -8,6 +8,7 @@
     "MixinClientMain",
     "MixinClientPlayNetworkHandler",
     "MixinDebugHud",
+    "MixinKeyboard",
     "MixinSoundEngine",
     "MixinSoundEngineSourceSetImpl",
     "MixinSoundExecutor",

@@ -1,5 +1,6 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
 import net.minecraft.client.options.GameOptions;
 import net.minecraft.client.sound.*;
@@ -16,7 +17,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Mixin(SoundSystem.class)
-public abstract class MixinSoundSystem implements ISoundSystem {
+public abstract class MixinSoundSystem implements ISoundSystem, Comparable<SoundSystem> {
 
     @Shadow
     private boolean started;
@@ -106,4 +107,9 @@ public abstract class MixinSoundSystem implements ISoundSystem {
     @Override
     public abstract SoundExecutor getTaskQueue();
 
+    @Override
+    public int compareTo(SoundSystem soundSystem) {
+        return ((ISoundEngine) soundEngine).getUsages().get(0).getUsed() -
+                ((ISoundEngine) ((ISoundSystem) soundSystem).getSoundEngine()).getUsages().get(0).getUsed();
+    }
 }

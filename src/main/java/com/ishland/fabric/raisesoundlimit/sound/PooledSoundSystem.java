@@ -1,12 +1,13 @@
 package com.ishland.fabric.raisesoundlimit.sound;
 
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.Sets;
 import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.options.GameOptions;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.sound.*;
@@ -15,20 +16,18 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.text.LiteralText;
 import net.minecraft.util.Identifier;
 import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.AbandonedConfig;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class PooledSoundSystem extends SoundSystem {
 
@@ -46,19 +45,24 @@ public class PooledSoundSystem extends SoundSystem {
 
     // Executors and pools
     private final GenericObjectPool<SoundSystem> pool;
+    private final Set<Thread> internalExecutorThreads = Sets.newConcurrentHashSet();
     private final ThreadPoolExecutor internalExecutor =
-            new ThreadPoolExecutor(1, Math.max(Runtime.getRuntime().availableProcessors() - 1, 1),
-                    60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
-                    new ThreadFactory() {
-                        private final AtomicLong serial = new AtomicLong(0);
+            (ThreadPoolExecutor) Executors.newCachedThreadPool(new ThreadFactory() {
+                private final AtomicLong serial = new AtomicLong(0);
 
-                        @Override
-                        public Thread newThread(Runnable runnable) {
-                            final Thread thread = new Thread(runnable);
-                            thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
-                            return thread;
+                @Override
+                public Thread newThread(Runnable runnable) {
+                    final Thread thread = new Thread(runnable);
+                    thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
+                    thread.setUncaughtExceptionHandler((thread1, throwable) -> {
+                        if (throwable instanceof ThreadDeath) {
+                            FabricLoader.logger.info("Worker thread stopped. ");
                         }
                     });
+                    internalExecutorThreads.add(thread);
+                    return thread;
+                }
+            });
 
     private long lastFetchTime = 0L;
     private String debugString = calculatingDebugString;
@@ -74,17 +78,21 @@ public class PooledSoundSystem extends SoundSystem {
         pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 8);
         pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 8);
         pool.setLifo(false);
+        final AbandonedConfig abandonedConfig = new AbandonedConfig();
+        abandonedConfig.setLogAbandoned(true);
+        abandonedConfig.setRemoveAbandonedOnMaintenance(true);
+        abandonedConfig.setRemoveAbandonedTimeout(3);
+        pool.setAbandonedConfig(abandonedConfig);
     }
 
     public void tryExtendSize() throws Exception {
         if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
-            FabricLoader.logger.info("Stopping sounds and extending size of sound system");
+            FabricLoader.logger.info("Extending size of sound system");
             MinecraftClient.getInstance().execute(() ->
                     MinecraftClient.getInstance().inGameHud.setOverlayMessage(
-                            new LiteralText("Stopping sounds and extending size of sound system"),
+                            new LiteralText("Extending size of sound system"),
                             false
                     ));
-            stopAll();
             pool.addObject();
         }
     }
@@ -286,13 +294,7 @@ public class PooledSoundSystem extends SoundSystem {
     }
 
     private void soundSystemForEach(Consumer<SoundSystem> consumer, boolean useExecutor) {
-        final Collection<PooledObject<SoundSystem>> systems;
-        try {
-            //noinspection unchecked
-            systems = ((Map<?, PooledObject<SoundSystem>>) allSoundSystemField.get().get(pool)).values();
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+        final Collection<PooledObject<SoundSystem>> systems = getPooledSystems();
         try {
             for (PooledObject<SoundSystem> pooledSystem : systems) {
                 if (useExecutor)
@@ -302,6 +304,74 @@ public class PooledSoundSystem extends SoundSystem {
             }
         } catch (BreakException ignored) {
         }
+    }
+
+    private Collection<PooledObject<SoundSystem>> getPooledSystems() {
+        final Collection<PooledObject<SoundSystem>> systems;
+        try {
+            //noinspection unchecked
+            systems = ((Map<?, PooledObject<SoundSystem>>) allSoundSystemField.get().get(pool)).values();
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        return systems;
+    }
+
+    public void killStuckExecutorThreads() {
+        new Thread(() -> {
+            final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
+            chatHud.addMessage(new LiteralText("Searching for currently \"stuck\" threads"));
+            List<Thread> possibleStuckThreads = new LinkedList<>();
+            for (Thread thread : internalExecutorThreads) {
+                if (thread.isAlive()) {
+                    if (thread.getState() == Thread.State.BLOCKED ||
+                            thread.getState() == Thread.State.TIMED_WAITING ||
+                            thread.getState() == Thread.State.WAITING) {
+                        possibleStuckThreads.add(thread);
+                    }
+                }
+            }
+            chatHud.addMessage(new LiteralText(
+                    String.format("Found %d threads, waiting for 3s...", possibleStuckThreads.size())));
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException ignored) {
+            }
+            for (Iterator<Thread> iterator = possibleStuckThreads.iterator(); iterator.hasNext(); ) {
+                Thread thread = iterator.next();
+                if (thread.isAlive()) {
+                    if (thread.getState() == Thread.State.BLOCKED ||
+                            thread.getState() == Thread.State.TIMED_WAITING ||
+                            thread.getState() == Thread.State.WAITING) {
+                        chatHud.addMessage(new LiteralText(
+                                String.format("Interrupting %s...", thread.getName())));
+                        thread.interrupt();
+                    } else
+                        iterator.remove();
+                }
+            }
+            chatHud.addMessage(new LiteralText(
+                    String.format("Interrupted %d threads, waiting for 3s...", possibleStuckThreads.size())));
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException ignored) {
+            }
+            for (Iterator<Thread> iterator = possibleStuckThreads.iterator(); iterator.hasNext(); ) {
+                Thread thread = iterator.next();
+                if (thread.isAlive()) {
+                    if (thread.getState() == Thread.State.BLOCKED ||
+                            thread.getState() == Thread.State.TIMED_WAITING ||
+                            thread.getState() == Thread.State.WAITING) {
+                        chatHud.addMessage(new LiteralText(
+                                String.format("Killing %s...", thread.getName())));
+                        thread.stop();
+                    } else
+                        iterator.remove();
+                }
+            }
+            chatHud.addMessage(new LiteralText(
+                    String.format("Killed %d threads", possibleStuckThreads.size())));
+        }).start();
     }
 
     private static final class BreakException extends RuntimeException {
