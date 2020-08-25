@@ -4,6 +4,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
 import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
+import com.ishland.fabric.raisesoundlimit.internal.SoundSystemPriorityObjectPool;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
 import net.minecraft.client.MinecraftClient;
@@ -47,22 +48,17 @@ public class PooledSoundSystem extends SoundSystem {
     private final GenericObjectPool<SoundSystem> pool;
     private final Set<Thread> internalExecutorThreads = Sets.newConcurrentHashSet();
     private final ThreadPoolExecutor internalExecutor =
-            (ThreadPoolExecutor) Executors.newCachedThreadPool(new ThreadFactory() {
-                private final AtomicLong serial = new AtomicLong(0);
+            (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors(), 1),
+                    new ThreadFactory() {
+                        private final AtomicLong serial = new AtomicLong(0);
 
-                @Override
-                public Thread newThread(Runnable runnable) {
-                    final Thread thread = new Thread(runnable);
-                    thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
-                    thread.setUncaughtExceptionHandler((thread1, throwable) -> {
-                        if (throwable instanceof ThreadDeath) {
-                            FabricLoader.logger.info("Worker thread stopped. ");
+                        @Override
+                        public Thread newThread(Runnable runnable) {
+                            final Thread thread = new Thread(runnable);
+                            thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
+                            return thread;
                         }
                     });
-                    internalExecutorThreads.add(thread);
-                    return thread;
-                }
-            });
 
     private long lastFetchTime = 0L;
     private String debugString = calculatingDebugString;
@@ -73,10 +69,10 @@ public class PooledSoundSystem extends SoundSystem {
         MixinUtils.logger.info("Removing flags for SoundSystem initialization prevention");
         MixinUtils.suppressSoundSystemInit = false;
         // Constructor arguments for SoundSystem
-        this.pool = new GenericObjectPool<>(new SoundSystemFactory(loader, settings, resourceManager));
+        this.pool = new SoundSystemPriorityObjectPool(new SoundSystemFactory(loader, settings, resourceManager));
         pool.setMinIdle(Runtime.getRuntime().availableProcessors());
-        pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 8);
-        pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 8);
+        pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 16);
+        pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 16);
         pool.setLifo(false);
         final AbandonedConfig abandonedConfig = new AbandonedConfig();
         abandonedConfig.setLogAbandoned(true);
