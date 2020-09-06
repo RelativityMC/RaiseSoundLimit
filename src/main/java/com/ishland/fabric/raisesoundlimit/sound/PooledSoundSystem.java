@@ -24,10 +24,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -63,6 +60,20 @@ public class PooledSoundSystem extends SoundSystem {
                             return thread;
                         }
                     });
+    private final ScheduledExecutorService internalScheduledExecutor =
+            Executors.newSingleThreadScheduledExecutor(
+                    new ThreadFactory() {
+                        private final AtomicLong serial = new AtomicLong(0);
+
+                        @Override
+                        public Thread newThread(Runnable runnable) {
+                            final Thread thread = new Thread(runnable);
+                            thread.setName("PooledSoundSystem Scheduled Executor - "
+                                    + serial.incrementAndGet());
+                            internalExecutorThreads.add(thread);
+                            return thread;
+                        }
+                    });
 
     private long lastFetchTime = 0L;
     private String debugString = calculatingDebugString;
@@ -92,6 +103,12 @@ public class PooledSoundSystem extends SoundSystem {
         abandonedConfig.setRemoveAbandonedOnMaintenance(true);
         abandonedConfig.setRemoveAbandonedTimeout(3);
         pool.setAbandonedConfig(abandonedConfig);
+        internalScheduledExecutor.scheduleAtFixedRate(
+                () -> this.tick(true),
+                50,
+                50,
+                TimeUnit.MILLISECONDS
+        );
     }
 
     public void tryExtendSize() throws Exception {
@@ -126,6 +143,7 @@ public class PooledSoundSystem extends SoundSystem {
     public void stop() {
         pool.close();
         internalExecutor.shutdown();
+        internalScheduledExecutor.shutdown();
     }
 
     @Override
