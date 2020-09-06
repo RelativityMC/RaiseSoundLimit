@@ -1,9 +1,11 @@
 package com.ishland.fabric.raisesoundlimit.sound;
 
 import com.google.common.base.Suppliers;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
+import com.ishland.fabric.raisesoundlimit.internal.SoundHandleCreationFailedException;
 import com.ishland.fabric.raisesoundlimit.internal.SoundSystemPriorityObjectPool;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
@@ -22,6 +24,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -56,6 +59,7 @@ public class PooledSoundSystem extends SoundSystem {
                         public Thread newThread(Runnable runnable) {
                             final Thread thread = new Thread(runnable);
                             thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
+                            internalExecutorThreads.add(thread);
                             return thread;
                         }
                     });
@@ -64,16 +68,25 @@ public class PooledSoundSystem extends SoundSystem {
     private String debugString = calculatingDebugString;
     private final AtomicBoolean isResourceLoaded = new AtomicBoolean(false);
 
+    final List<SoundInstanceListener> listeners = Lists.newArrayList();
+    final List<TickableSoundInstance> soundsToPlayNextTick = Lists.newArrayList();
+    final Map<SoundInstance, Long> startTicks = new ConcurrentHashMap<>();
+
+    final AtomicLong ticks = new AtomicLong(0L);
+
     public PooledSoundSystem(SoundManager loader, GameOptions settings, ResourceManager resourceManager) throws Exception {
         super(loader, settings, resourceManager);
         MixinUtils.logger.info("Removing flags for SoundSystem initialization prevention");
         MixinUtils.suppressSoundSystemInit = false;
         // Constructor arguments for SoundSystem
-        this.pool = new SoundSystemPriorityObjectPool(new SoundSystemFactory(loader, settings, resourceManager));
+        this.pool = new SoundSystemPriorityObjectPool(new SoundSystemFactory(loader, settings, resourceManager, this));
         pool.setMinIdle(Runtime.getRuntime().availableProcessors());
         pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 16);
         pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 16);
         pool.setLifo(false);
+        pool.setTestOnBorrow(true);
+        pool.setTestOnCreate(true);
+        pool.setTestOnReturn(true);
         final AbandonedConfig abandonedConfig = new AbandonedConfig();
         abandonedConfig.setLogAbandoned(true);
         abandonedConfig.setRemoveAbandonedOnMaintenance(true);
@@ -127,17 +140,20 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void registerListener(SoundInstanceListener soundInstanceListener) {
+        this.listeners.add(soundInstanceListener);
         soundSystemForEach(soundSystem -> soundSystem.registerListener(soundInstanceListener), true);
     }
 
     @Override
     public void unregisterListener(SoundInstanceListener soundInstanceListener) {
+        this.listeners.remove(soundInstanceListener);
         soundSystemForEach(soundSystem -> soundSystem.unregisterListener(soundInstanceListener), true);
     }
 
     @Override
     public void tick(boolean bl) {
         if (!isResourceLoaded.get()) return;
+        ticks.incrementAndGet();
         internalExecutor.execute(() -> {
             try {
                 pool.preparePool();
@@ -145,6 +161,21 @@ public class PooledSoundSystem extends SoundSystem {
                 e.printStackTrace();
             }
         });
+        if (!bl) {
+            for (TickableSoundInstance soundInstance : soundsToPlayNextTick)
+                play(soundInstance);
+            Iterator<Map.Entry<SoundInstance, Long>> iterator = this.startTicks.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<SoundInstance, Long> entry = iterator.next();
+                if (this.ticks.get() >= entry.getValue()) {
+                    SoundInstance sound = entry.getKey();
+                    if (sound instanceof TickableSoundInstance)
+                        ((TickableSoundInstance) sound).tick();
+                    this.play(sound);
+                    iterator.remove();
+                }
+            }
+        }
         soundSystemForEach(soundSystem -> soundSystem.tick(bl), true);
     }
 
@@ -171,6 +202,8 @@ public class PooledSoundSystem extends SoundSystem {
             }
             try {
                 soundSystem.play(soundInstance);
+            } catch (SoundHandleCreationFailedException e) {
+                play(soundInstance);
             } catch (Throwable t) {
                 try {
                     pool.invalidateObject(soundSystem);
@@ -184,24 +217,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void playNextTick(TickableSoundInstance sound) {
-        internalExecutor.execute(() -> {
-            final SoundSystem soundSystem;
-            try {
-                soundSystem = pool.borrowObject();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            try {
-                soundSystem.playNextTick(sound);
-            } catch (Throwable t) {
-                try {
-                    pool.invalidateObject(soundSystem);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            pool.returnObject(soundSystem);
-        });
+        this.soundsToPlayNextTick.add(sound);
     }
 
     @Override
@@ -221,24 +237,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void play(SoundInstance sound, int delay) {
-        internalExecutor.execute(() -> {
-            final SoundSystem soundSystem;
-            try {
-                soundSystem = pool.borrowObject();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            try {
-                soundSystem.play(sound, delay);
-            } catch (Throwable t) {
-                try {
-                    pool.invalidateObject(soundSystem);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            pool.returnObject(soundSystem);
-        });
+        this.startTicks.put(sound, this.ticks.get() + delay);
     }
 
     @Override
@@ -259,10 +258,10 @@ public class PooledSoundSystem extends SoundSystem {
             List<List<SourceSetUsage>> list = new LinkedList<>();
             soundSystemForEach(soundSystem ->
                     list.add(((ISoundEngine) ((ISoundSystem) soundSystem).getSoundEngine()).getUsages()), false);
-            int[] used = new int[list.get(0).size()];
-            int[] max = new int[list.get(0).size()];
+            int[] used = new int[2];
+            int[] max = new int[2];
             list.forEach(sourceSetUsages -> {
-                for (int i = 0, sourceSetUsagesLength = sourceSetUsages.size(); i < sourceSetUsagesLength; i++) {
+                for (int i = 0, sourceSetUsagesLength = sourceSetUsages.size(); i < sourceSetUsagesLength && i < 2; i++) {
                     SourceSetUsage usage = sourceSetUsages.get(i);
                     used[i] += usage.getUsed();
                     max[i] += usage.getMax();
@@ -306,7 +305,8 @@ public class PooledSoundSystem extends SoundSystem {
         final Collection<PooledObject<SoundSystem>> systems;
         try {
             //noinspection unchecked
-            systems = ((Map<?, PooledObject<SoundSystem>>) allSoundSystemField.get().get(pool)).values();
+            systems = new LinkedList<>(
+                    ((Map<?, PooledObject<SoundSystem>>) allSoundSystemField.get().get(pool)).values());
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }

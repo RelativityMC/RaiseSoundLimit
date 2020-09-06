@@ -30,7 +30,7 @@ public abstract class MixinSoundManager implements ISoundManager {
             ),
             cancellable = true
     )
-    public void onPreInit(ResourceManager resourceManager, GameOptions gameOptions, CallbackInfo ci) throws Exception {
+    public void onPostInit(ResourceManager resourceManager, GameOptions gameOptions, CallbackInfo ci) throws Exception {
         MixinUtils.logger.info("Initializing PooledSoundSystem");
         soundSystem = new PooledSoundSystem(SoundManager.class.cast(this), gameOptions, resourceManager);
         ci.cancel();

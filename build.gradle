@@ -114,6 +114,7 @@ shadowJar {
 		exclude(dependency('net.minecrell::'))
 		exclude(dependency('org.jline::'))
 	}
+	exclude "mappings/"
 }
 
 task("remapShadowJar", type: RemapJarTask, dependsOn: shadowJar) {

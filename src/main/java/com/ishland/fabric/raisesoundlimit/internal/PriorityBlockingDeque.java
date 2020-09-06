@@ -1,13 +1,14 @@
 package com.ishland.fabric.raisesoundlimit.internal;
 
+import org.apache.commons.pool2.impl.ApacheLinkedBlockingDeque;
+
 import java.util.*;
 import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
+/*
  * Copyright (c) 2007, Aviad Ben Dov
  * <p>
  * All rights reserved.
@@ -57,7 +58,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @since 0.3
  */
 public class PriorityBlockingDeque<E>
-        extends PriorityBlockingQueue<E>
+        extends ApacheLinkedBlockingDeque<E>
         implements BlockingDeque<E>, java.io.Serializable {
 
     /*

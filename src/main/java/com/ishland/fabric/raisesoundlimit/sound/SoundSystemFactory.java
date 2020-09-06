@@ -1,13 +1,14 @@
 package com.ishland.fabric.raisesoundlimit.sound;
 
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
 import net.minecraft.client.options.GameOptions;
+import net.minecraft.client.sound.SoundInstanceListener;
 import net.minecraft.client.sound.SoundManager;
 import net.minecraft.client.sound.SoundSystem;
 import net.minecraft.resource.ResourceManager;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.PooledObject;
-import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 
 class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
@@ -15,14 +16,17 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
     private final SoundManager loader;
     private final GameOptions settings;
     private final ResourceManager resourceManager;
+    private final PooledSoundSystem pooledSoundSystem;
 
     SoundSystemFactory(SoundManager loader,
                        GameOptions settings,
-                       ResourceManager resourceManager) {
+                       ResourceManager resourceManager,
+                       PooledSoundSystem pooledSoundSystem) {
         super();
         this.loader = loader;
         this.settings = settings;
         this.resourceManager = resourceManager;
+        this.pooledSoundSystem = pooledSoundSystem;
     }
 
     /**
@@ -38,6 +42,8 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
     public SoundSystem create() throws Exception {
         final SoundSystem soundSystem = new SoundSystem(loader, settings, resourceManager);
         soundSystem.reloadSounds();
+        for (SoundInstanceListener listener : pooledSoundSystem.listeners)
+            soundSystem.registerListener(listener);
         return soundSystem;
     }
 
@@ -85,6 +91,6 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
      */
     @Override
     public boolean validateObject(PooledObject<SoundSystem> p) {
-        return true; // TODO
+        return ((ISoundSystem) p.getObject()).isValid();
     }
 }

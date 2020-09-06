@@ -16,7 +16,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Mixin(SoundExecutor.class)
 public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
 
-    @Shadow private volatile boolean stopped;
+    @Shadow
+    private volatile boolean stopped;
+    @Shadow
+    private Thread thread;
     private static final AtomicInteger serial = new AtomicInteger(0);
 
     protected MixinSoundExecutor(String name) {
@@ -25,7 +28,7 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
 
     @Inject(method = "createThread", at = @At("HEAD"), cancellable = true)
     public void onPreCreateThread(CallbackInfoReturnable<Thread> cir) {
-        if(MixinUtils.suppressSoundSystemInit) {
+        if (MixinUtils.suppressSoundSystemInit) {
             MixinUtils.logger.info("Suppressing SoundSystem SoundExecutor initialization");
             cir.setReturnValue(null);
         }
@@ -48,10 +51,22 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
      * @reason dont stop thread
      */
     @Overwrite
-    public void restart(){
+    public void restart() {
         this.stopped = true;
         this.cancelTasks();
         this.stopped = false;
     }
 
+    @Override
+    public void close() {
+        this.stopped = true;
+        this.thread.interrupt();
+        try {
+            this.thread.join();
+        } catch (InterruptedException var2) {
+            Thread.currentThread().interrupt();
+        }
+
+        this.cancelTasks();
+    }
 }
