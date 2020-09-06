@@ -78,6 +78,7 @@ public class PooledSoundSystem extends SoundSystem {
     private long lastFetchTime = 0L;
     private String debugString = calculatingDebugString;
     private final AtomicBoolean isResourceLoaded = new AtomicBoolean(false);
+    private final AtomicBoolean nextBL = new AtomicBoolean(false);
 
     final List<SoundInstanceListener> listeners = Lists.newArrayList();
     final List<TickableSoundInstance> soundsToPlayNextTick = Lists.newArrayList();
@@ -104,7 +105,7 @@ public class PooledSoundSystem extends SoundSystem {
         abandonedConfig.setRemoveAbandonedTimeout(3);
         pool.setAbandonedConfig(abandonedConfig);
         internalScheduledExecutor.scheduleAtFixedRate(
-                () -> this.tick(true),
+                this::tick0,
                 50,
                 50,
                 TimeUnit.MILLISECONDS
@@ -178,6 +179,13 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void tick(boolean bl) {
+        if (!bl)
+            nextBL.set(false);
+    }
+
+    private void tick0() {
+        boolean bl = nextBL.get();
+        nextBL.set(true);
         if (!isResourceLoaded.get()) return;
         ticks.incrementAndGet();
         internalExecutor.execute(() -> {
