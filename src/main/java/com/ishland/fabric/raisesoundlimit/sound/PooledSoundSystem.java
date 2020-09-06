@@ -111,7 +111,7 @@ public class PooledSoundSystem extends SoundSystem {
         );
     }
 
-    public void tryExtendSize() throws Exception {
+    public void tryExtendSize() {
         if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
             FabricLoader.logger.info("Extending size of sound system");
             MinecraftClient.getInstance().execute(() ->
@@ -119,7 +119,15 @@ public class PooledSoundSystem extends SoundSystem {
                             new LiteralText("Extending size of sound system"),
                             false
                     ));
-            pool.addObject();
+            try {
+                pool.addObject();
+            } catch (Exception e) {
+                final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
+                chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
+                chatHud.addMessage(new LiteralText(e.toString()));
+                this.pool.setMaxTotal(this.pool.getNumIdle() * 2 / 3);
+                this.pool.setMaxIdle(this.pool.getNumIdle() * 2 / 3);
+            }
         }
     }
 

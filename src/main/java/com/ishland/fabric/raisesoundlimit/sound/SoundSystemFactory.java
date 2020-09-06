@@ -42,6 +42,9 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
     public SoundSystem create() throws Exception {
         final SoundSystem soundSystem = new SoundSystem(loader, settings, resourceManager);
         soundSystem.reloadSounds();
+        //noinspection ConstantConditions
+        if (!((ISoundSystem) soundSystem).isValid())
+            throw new IllegalStateException("Creation failed due to verification failure");
         for (SoundInstanceListener listener : pooledSoundSystem.listeners)
             soundSystem.registerListener(listener);
         return soundSystem;

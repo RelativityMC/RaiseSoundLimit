@@ -212,12 +212,23 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
                     target = "Lorg/apache/logging/log4j/Logger;debug(Lorg/apache/logging/log4j/Marker;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V"
             )
     )
-    public void onPlay(Logger logger, Marker marker, String message, Object p0, Object p1) {
+    public void onPrePlay(Logger logger, Marker marker, String message, Object p0, Object p1) {
         if (!message.equals("Playing sound {} for event {}")) {
             logger.debug(marker, message, p0, p1);
             return;
         }
         failedCount.set(0);
+    }
+
+    @Inject(
+            method = "play(Lnet/minecraft/client/sound/SoundInstance;)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lorg/apache/logging/log4j/Logger;debug(Lorg/apache/logging/log4j/Marker;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V"
+            )
+    )
+    public void onPlay() {
+
     }
 
 }
