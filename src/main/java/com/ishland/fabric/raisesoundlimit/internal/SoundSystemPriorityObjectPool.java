@@ -1,5 +1,6 @@
 package com.ishland.fabric.raisesoundlimit.internal;
 
+import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import net.minecraft.client.sound.SoundSystem;
 import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -32,7 +33,7 @@ public final class SoundSystemPriorityObjectPool extends GenericObjectPool<Sound
             idleObjectsField.setAccessible(true);
             idleObjectsField.set(this, new PriorityBlockingDeque<>());
         } catch (Throwable t) {
-            throw new RuntimeException(t);
+            FabricLoader.logger.warn("Error making queue prioritized", t);
         }
     }
 }

@@ -228,25 +228,34 @@ public class PooledSoundSystem extends SoundSystem {
     @Override
     public void play(SoundInstance soundInstance) {
         internalExecutor.execute(() -> {
-            final SoundSystem soundSystem;
+            for (int i = 0; i < this.pool.getNumIdle(); i++)
+                try {
+                    play0(soundInstance);
+                    break;
+                } catch (SoundHandleCreationFailedException ignored) {
+                }
+        });
+    }
+
+    private void play0(SoundInstance soundInstance) {
+        final SoundSystem soundSystem;
+        try {
+            soundSystem = pool.borrowObject();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            soundSystem.play(soundInstance);
+        } catch (SoundHandleCreationFailedException e) {
+            throw e;
+        } catch (Throwable t) {
             try {
-                soundSystem = pool.borrowObject();
+                pool.invalidateObject(soundSystem);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            try {
-                soundSystem.play(soundInstance);
-            } catch (SoundHandleCreationFailedException e) {
-                play(soundInstance);
-            } catch (Throwable t) {
-                try {
-                    pool.invalidateObject(soundSystem);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            pool.returnObject(soundSystem);
-        });
+        }
+        pool.returnObject(soundSystem);
     }
 
     @Override
