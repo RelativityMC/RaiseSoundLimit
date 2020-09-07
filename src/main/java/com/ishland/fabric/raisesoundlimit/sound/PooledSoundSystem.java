@@ -99,6 +99,7 @@ public class PooledSoundSystem extends SoundSystem {
         pool.setTestOnBorrow(true);
         pool.setTestOnCreate(true);
         pool.setTestOnReturn(true);
+        pool.setTimeBetweenEvictionRunsMillis(1000);
         final AbandonedConfig abandonedConfig = new AbandonedConfig();
         abandonedConfig.setLogAbandoned(true);
         abandonedConfig.setRemoveAbandonedOnMaintenance(true);
