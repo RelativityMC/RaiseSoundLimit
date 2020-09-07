@@ -79,7 +79,7 @@ public abstract class MixinSource {
     public void onPreTick(CallbackInfo ci) {
         if (startTime.get() != -1) {
             if (!isStopped() &&
-                    System.currentTimeMillis() - startTime.get() > (lengthSec.get() + 1) * 1000)
+                    System.currentTimeMillis() - startTime.get() > (lengthSec.get() + 5) * 1000)
                 timeout.set(true);
         }
     }
