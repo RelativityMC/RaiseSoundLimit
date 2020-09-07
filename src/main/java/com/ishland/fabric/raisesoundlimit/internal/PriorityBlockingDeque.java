@@ -789,10 +789,10 @@ public class PriorityBlockingDeque<E>
 
     @Override
     public Iterator<E> iterator() {
-        return list.iterator();
+        return Collections.unmodifiableList(new LinkedList<>(list)).iterator();
     }
 
     public Iterator<E> descendingIterator() {
-        return list.descendingIterator();
+        return new LinkedList<>(list).descendingIterator();
     }
 }
