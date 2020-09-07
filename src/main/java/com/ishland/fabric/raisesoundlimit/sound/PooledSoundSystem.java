@@ -254,8 +254,9 @@ public class PooledSoundSystem extends SoundSystem {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        } finally {
+            pool.returnObject(soundSystem);
         }
-        pool.returnObject(soundSystem);
     }
 
     @Override
