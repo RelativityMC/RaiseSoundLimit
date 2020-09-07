@@ -220,15 +220,4 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
         failedCount.set(0);
     }
 
-    @Inject(
-            method = "play(Lnet/minecraft/client/sound/SoundInstance;)V",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lorg/apache/logging/log4j/Logger;debug(Lorg/apache/logging/log4j/Marker;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V"
-            )
-    )
-    public void onPlay() {
-
-    }
-
 }
