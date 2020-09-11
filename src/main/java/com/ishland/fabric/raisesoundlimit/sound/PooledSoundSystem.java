@@ -85,6 +85,7 @@ public class PooledSoundSystem extends SoundSystem {
     final Map<SoundInstance, Long> startTicks = new ConcurrentHashMap<>();
 
     final AtomicLong ticks = new AtomicLong(0L);
+    final AtomicBoolean canExtend = new AtomicBoolean(true);
 
     public PooledSoundSystem(SoundManager loader, GameOptions settings, ResourceManager resourceManager) throws Exception {
         super(loader, settings, resourceManager);
@@ -113,23 +114,26 @@ public class PooledSoundSystem extends SoundSystem {
     }
 
     public void tryExtendSize() {
-        if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
-            FabricLoader.logger.info("Extending size of sound system");
-            MinecraftClient.getInstance().execute(() ->
-                    MinecraftClient.getInstance().inGameHud.setOverlayMessage(
-                            new LiteralText("Extending size of sound system"),
-                            false
-                    ));
-            try {
-                pool.addObject();
-            } catch (Exception e) {
-                final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
-                chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
-                chatHud.addMessage(new LiteralText(e.toString()));
-                this.pool.setMaxTotal(this.pool.getNumIdle() * 2 / 3);
-                this.pool.setMaxIdle(this.pool.getNumIdle() * 2 / 3);
+        internalExecutor.execute(() -> {
+            if (canExtend.get() && pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
+                FabricLoader.logger.info("Extending size of sound system");
+                MinecraftClient.getInstance().execute(() ->
+                        MinecraftClient.getInstance().inGameHud.setOverlayMessage(
+                                new LiteralText("Extending size of sound system"),
+                                false
+                        ));
+                try {
+                    pool.addObject();
+                } catch (Exception e) {
+                    final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
+                    chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
+                    chatHud.addMessage(new LiteralText(e.toString()));
+                    this.pool.setMaxTotal(this.pool.getNumIdle() * 2 / 3);
+                    this.pool.setMaxIdle(this.pool.getNumIdle() * 2 / 3);
+                    this.canExtend.set(false);
+                }
             }
-        }
+        });
     }
 
     @Override

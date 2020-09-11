@@ -6,7 +6,9 @@ import com.google.common.collect.Sets;
 import com.ishland.fabric.raisesoundlimit.internal.ConcurrentLinkedList;
 import com.ishland.fabric.raisesoundlimit.internal.SoundHandleCreationFailedException;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundManager;
 import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.options.GameOptions;
 import net.minecraft.client.sound.*;
 import net.minecraft.resource.ResourceManager;
@@ -202,6 +204,8 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
             return;
         }
         failedCount.incrementAndGet();
+        ((ISoundManager) MinecraftClient.getInstance().getSoundManager())
+                .getSoundSystem().tryExtendSize();
         throw new SoundHandleCreationFailedException(message);
     }
 
