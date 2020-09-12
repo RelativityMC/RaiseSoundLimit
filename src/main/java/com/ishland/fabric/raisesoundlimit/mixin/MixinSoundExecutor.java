@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +25,12 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
 
     protected MixinSoundExecutor(String name) {
         super(name);
+    }
+
+    @Inject(method = "<init>", at = @At("TAIL"))
+    public void postConstruct(CallbackInfo ci) {
+        if (thread != null)
+            thread.setPriority(4);
     }
 
     @Inject(method = "createThread", at = @At("HEAD"), cancellable = true)
@@ -43,7 +50,7 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
             )
     )
     public String setThreadName(String threadName){
-        return "PooledSoundEngine - " + serial.incrementAndGet();
+        return "RSLSound-" + serial.incrementAndGet();
     }
 
     /**

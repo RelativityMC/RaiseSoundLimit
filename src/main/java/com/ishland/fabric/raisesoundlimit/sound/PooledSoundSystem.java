@@ -55,7 +55,8 @@ public class PooledSoundSystem extends SoundSystem {
                         @Override
                         public Thread newThread(Runnable runnable) {
                             final Thread thread = new Thread(runnable);
-                            thread.setName("PooledSoundSystem Executor - " + serial.incrementAndGet());
+                            thread.setName("RSLExec-" + serial.incrementAndGet());
+                            thread.setPriority(4);
                             internalExecutorThreads.add(thread);
                             return thread;
                         }
@@ -68,8 +69,9 @@ public class PooledSoundSystem extends SoundSystem {
                         @Override
                         public Thread newThread(Runnable runnable) {
                             final Thread thread = new Thread(runnable);
-                            thread.setName("PooledSoundSystem Scheduled Executor - "
+                            thread.setName("RSLSExec-"
                                     + serial.incrementAndGet());
+                            thread.setPriority(4);
                             internalExecutorThreads.add(thread);
                             return thread;
                         }
@@ -192,13 +194,11 @@ public class PooledSoundSystem extends SoundSystem {
         nextBL.set(true);
         if (!isResourceLoaded.get()) return;
         ticks.incrementAndGet();
-        internalExecutor.execute(() -> {
-            try {
-                pool.evict();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        try {
+            pool.evict();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         if (!bl) {
             for (TickableSoundInstance soundInstance : soundsToPlayNextTick)
                 play(soundInstance);
@@ -342,8 +342,17 @@ public class PooledSoundSystem extends SoundSystem {
             for (PooledObject<SoundSystem> pooledSystem : systems) {
                 if (useExecutor)
                     internalExecutor.execute(() -> consumer.accept(pooledSystem.getObject()));
-                else
+                else try {
                     consumer.accept(pooledSystem.getObject());
+                } catch (BreakException breakException) {
+                    throw breakException;
+                } catch (Throwable t) {
+                    try {
+                        this.pool.invalidateObject(pooledSystem.getObject());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         } catch (BreakException ignored) {
         }
