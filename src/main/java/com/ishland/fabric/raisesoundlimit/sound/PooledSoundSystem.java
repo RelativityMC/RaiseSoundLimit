@@ -108,7 +108,13 @@ public class PooledSoundSystem extends SoundSystem {
         abandonedConfig.setRemoveAbandonedTimeout(3);
         pool.setAbandonedConfig(abandonedConfig);
         internalScheduledExecutor.scheduleAtFixedRate(
-                this::tick0,
+                () -> {
+                    try {
+                        tick0();
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    }
+                },
                 50,
                 50,
                 TimeUnit.MILLISECONDS
