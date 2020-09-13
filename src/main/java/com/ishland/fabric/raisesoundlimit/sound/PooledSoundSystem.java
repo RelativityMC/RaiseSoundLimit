@@ -156,9 +156,9 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void stop() {
+        internalScheduledExecutor.shutdown();
         pool.close();
         internalExecutor.shutdown();
-        internalScheduledExecutor.shutdown();
     }
 
     @Override
@@ -196,6 +196,7 @@ public class PooledSoundSystem extends SoundSystem {
         ticks.incrementAndGet();
         try {
             pool.evict();
+            pool.preparePool();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -214,7 +215,7 @@ public class PooledSoundSystem extends SoundSystem {
                 }
             }
         }
-        soundSystemForEach(soundSystem -> soundSystem.tick(bl), true);
+        soundSystemForEach(soundSystem -> soundSystem.tick(bl), false);
     }
 
     @Override
@@ -341,7 +342,17 @@ public class PooledSoundSystem extends SoundSystem {
         try {
             for (PooledObject<SoundSystem> pooledSystem : systems) {
                 if (useExecutor)
-                    internalExecutor.execute(() -> consumer.accept(pooledSystem.getObject()));
+                    internalExecutor.execute(() -> {
+                        try {
+                            consumer.accept(pooledSystem.getObject());
+                        } catch (Throwable t) {
+                            try {
+                                this.pool.invalidateObject(pooledSystem.getObject());
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
                 else try {
                     consumer.accept(pooledSystem.getObject());
                 } catch (BreakException breakException) {

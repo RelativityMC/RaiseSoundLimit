@@ -1,5 +1,7 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
+import com.google.common.util.concurrent.AtomicDouble;
+import com.ishland.fabric.raisesoundlimit.internal.SourceTimeoutException;
 import com.ishland.fabric.raisesoundlimit.mixininterface.IStaticSound;
 import net.minecraft.client.sound.Source;
 import net.minecraft.client.sound.StaticSound;
@@ -30,6 +32,7 @@ public abstract class MixinSource {
     private final AtomicInteger lengthSec = new AtomicInteger(0);
     private final AtomicLong startTime = new AtomicLong(-1);
     private final AtomicBoolean timeout = new AtomicBoolean(false);
+    private final AtomicDouble pitch = new AtomicDouble(1.0D);
 
     @Inject(
             method = "setBuffer",
@@ -78,9 +81,17 @@ public abstract class MixinSource {
     @Inject(method = "tick", at = @At("HEAD"))
     public void onPreTick(CallbackInfo ci) {
         if (startTime.get() != -1) {
-            if (!isStopped() &&
-                    System.currentTimeMillis() - startTime.get() > (lengthSec.get() + 5) * 1000)
+            if (!isStopped() && startTime.get() != -1 &&
+                    (System.currentTimeMillis() - startTime.get()) / pitch.get()
+                            > (lengthSec.get() + 8) * 1000) {
                 timeout.set(true);
+                throw new SourceTimeoutException("Source playing timed out");
+            }
         }
+    }
+
+    @Inject(method = "setPitch", at = @At("HEAD"))
+    public void onSetPitch(float f, CallbackInfo ci) {
+        this.pitch.set(f);
     }
 }

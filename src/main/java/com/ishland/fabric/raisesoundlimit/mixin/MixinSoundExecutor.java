@@ -21,6 +21,7 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
     private volatile boolean stopped;
     @Shadow
     private Thread thread;
+
     private static final AtomicInteger serial = new AtomicInteger(0);
 
     protected MixinSoundExecutor(String name) {
