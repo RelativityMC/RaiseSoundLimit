@@ -47,7 +47,7 @@ public class PooledSoundSystem extends SoundSystem {
     // Executors and pools
     private final GenericObjectPool<SoundSystem> pool;
     private final Set<Thread> internalExecutorThreads = Sets.newConcurrentHashSet();
-    private final ThreadPoolExecutor internalExecutor =
+    final ThreadPoolExecutor internalExecutor =
             (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors(), 1),
                     new ThreadFactory() {
                         private final AtomicLong serial = new AtomicLong(0);
@@ -61,7 +61,7 @@ public class PooledSoundSystem extends SoundSystem {
                             return thread;
                         }
                     });
-    private final ScheduledExecutorService internalScheduledExecutor =
+    final ScheduledExecutorService internalScheduledExecutor =
             Executors.newSingleThreadScheduledExecutor(
                     new ThreadFactory() {
                         private final AtomicLong serial = new AtomicLong(0);
