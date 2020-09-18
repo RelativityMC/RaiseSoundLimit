@@ -87,7 +87,6 @@ public class PooledSoundSystem extends SoundSystem {
     final Map<SoundInstance, Long> startTicks = new ConcurrentHashMap<>();
 
     final AtomicLong ticks = new AtomicLong(0L);
-    final AtomicBoolean canExtend = new AtomicBoolean(true);
 
     public PooledSoundSystem(SoundManager loader, GameOptions settings, ResourceManager resourceManager) throws Exception {
         super(loader, settings, resourceManager);
@@ -123,7 +122,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     public void tryExtendSize() {
         internalExecutor.execute(() -> {
-            if (canExtend.get() && pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
+            if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
                 FabricLoader.logger.info("Extending size of sound system");
                 MinecraftClient.getInstance().execute(() ->
                         MinecraftClient.getInstance().inGameHud.setOverlayMessage(
@@ -138,7 +137,6 @@ public class PooledSoundSystem extends SoundSystem {
                     chatHud.addMessage(new LiteralText(e.toString()));
                     this.pool.setMaxTotal(this.pool.getNumIdle() * 2 / 3);
                     this.pool.setMaxIdle(this.pool.getNumIdle() * 2 / 3);
-                    this.canExtend.set(false);
                 }
             }
         });
