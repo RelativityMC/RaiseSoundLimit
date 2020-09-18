@@ -122,7 +122,7 @@ public class PooledSoundSystem extends SoundSystem {
 
     public void tryExtendSize() {
         internalExecutor.execute(() -> {
-            if (pool.getNumActive() + pool.getNumIdle() < pool.getMaxTotal()) {
+            if (getPoolTotal() < pool.getMaxTotal()) {
                 FabricLoader.logger.info("Extending size of sound system");
                 MinecraftClient.getInstance().execute(() ->
                         MinecraftClient.getInstance().inGameHud.setOverlayMessage(
@@ -135,11 +135,15 @@ public class PooledSoundSystem extends SoundSystem {
                     final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
                     chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
                     chatHud.addMessage(new LiteralText(e.toString()));
-                    this.pool.setMaxTotal(this.pool.getNumIdle() * 2 / 3);
-                    this.pool.setMaxIdle(this.pool.getNumIdle() * 2 / 3);
+                    this.pool.setMaxTotal(getPoolTotal() * 2 / 3);
+                    this.pool.setMaxIdle(getPoolTotal() * 2 / 3);
                 }
             }
         });
+    }
+
+    private int getPoolTotal() {
+        return this.pool.getNumIdle() + pool.getNumActive();
     }
 
     @Override
@@ -335,7 +339,7 @@ public class PooledSoundSystem extends SoundSystem {
     public List<String> getRightDebugString() {
         List<String> list = new LinkedList<>();
         list.add(String.format("SoundSystem pool size: %d/%d/%d",
-                pool.getNumActive(), pool.getNumActive() + pool.getNumIdle(), pool.getMaxTotal()));
+                pool.getNumActive(), getPoolTotal(), pool.getMaxTotal()));
         list.add(String.format("SoundSystem executor size: %d/%d/%d",
                 internalExecutor.getActiveCount(), internalExecutor.getPoolSize(), internalExecutor.getMaximumPoolSize()));
         return list;
