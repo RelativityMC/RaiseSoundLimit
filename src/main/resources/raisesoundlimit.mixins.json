@@ -17,7 +17,8 @@
     "MixinSource",
     "MixinSourceManager",
     "MixinStaticSound",
-    "MixinSubtitlesHud"
+    "MixinSubtitlesHud",
+    "MixinThreadExecutor"
   ],
   "injectors": {
     "defaultRequire": 1

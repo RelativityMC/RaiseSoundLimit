@@ -1,13 +1,12 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.ishland.fabric.raisesoundlimit.internal.ConcurrentLinkedList;
 import com.ishland.fabric.raisesoundlimit.internal.SoundHandleCreationFailedException;
-import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundEngine;
-import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundManager;
-import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundSystem;
+import com.ishland.fabric.raisesoundlimit.mixininterface.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.options.GameOptions;
 import net.minecraft.client.sound.*;
@@ -26,8 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Mixin(SoundSystem.class)
@@ -135,9 +133,10 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
      * @reason start SoundSystem on SoundExecutor
      */
     @Overwrite
-    private synchronized void start() {
+    private synchronized void start() throws InterruptedException, ExecutionException, TimeoutException {
         if (!this.started) {
-            taskQueue.submitAndJoin(() -> {
+            checkThread();
+            ((IThreadExecutor) taskQueue).ISubmitAsync(() -> {
                 if (!this.started) {
                     try {
                         this.soundEngine.init();
@@ -152,8 +151,15 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
                         LOGGER.error(MARKER, "Error starting SoundSystem. Turning off sounds & music", var2);
                     }
                 }
-            });
+            }).get(10, TimeUnit.SECONDS); // Run with timeout
         }
+    }
+
+    private void checkThread() {
+        Preconditions.checkState(
+                ((ISoundExecutor) taskQueue).getThread().isAlive(),
+                "Thread is not alive"
+        ); // Check if thread is still there
     }
 
     /**
@@ -161,14 +167,15 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
      * @reason stop SoundSystem on SoundExecutor
      */
     @Overwrite
-    public void stop() {
+    public void stop() throws InterruptedException, ExecutionException, TimeoutException {
         if (this.started) {
-            this.taskQueue.submitAndJoin(() -> {
+            checkThread();
+            ((IThreadExecutor) taskQueue).ISubmitAsync(() -> {
                 this.stopAll();
                 this.soundEngine.close();
                 this.taskQueue.close();
                 this.started = false;
-            });
+            }).get(10, TimeUnit.SECONDS); // Run with timeout
         }
     }
 

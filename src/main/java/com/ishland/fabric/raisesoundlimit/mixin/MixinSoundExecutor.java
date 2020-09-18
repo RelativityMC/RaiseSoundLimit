@@ -1,6 +1,7 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
+import com.ishland.fabric.raisesoundlimit.mixininterface.ISoundExecutor;
 import net.minecraft.client.sound.SoundExecutor;
 import net.minecraft.util.thread.ThreadExecutor;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Mixin(SoundExecutor.class)
-public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> {
+public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> implements ISoundExecutor {
 
     @Shadow
     private volatile boolean stopped;
