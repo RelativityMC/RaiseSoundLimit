@@ -78,4 +78,9 @@ public abstract class MixinSoundExecutor extends ThreadExecutor<Runnable> implem
 
         this.cancelTasks();
     }
+
+    @Override
+    public Thread IGetThread() {
+        return this.getThread();
+    }
 }

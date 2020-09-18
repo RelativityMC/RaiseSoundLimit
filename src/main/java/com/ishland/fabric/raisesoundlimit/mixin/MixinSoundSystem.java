@@ -157,7 +157,7 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
 
     private void checkThread() {
         Preconditions.checkState(
-                ((ISoundExecutor) taskQueue).getThread().isAlive(),
+                ((ISoundExecutor) taskQueue).IGetThread().isAlive(),
                 "Thread is not alive"
         ); // Check if thread is still there
     }
