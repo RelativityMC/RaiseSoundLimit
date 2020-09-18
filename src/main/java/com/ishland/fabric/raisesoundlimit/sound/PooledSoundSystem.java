@@ -27,6 +27,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -85,6 +86,10 @@ public class PooledSoundSystem extends SoundSystem {
     final List<SoundInstanceListener> listeners = Lists.newArrayList();
     final List<TickableSoundInstance> soundsToPlayNextTick = Lists.newArrayList();
     final Map<SoundInstance, Long> startTicks = new ConcurrentHashMap<>();
+
+    private final AtomicLong lastTickStart = new AtomicLong(-1L);
+    private final AtomicLong lastTickTime = new AtomicLong(-1L);
+    private final AtomicReference<String> tickingStage = new AtomicReference<>("");
 
     final AtomicLong ticks = new AtomicLong(0L);
 
@@ -197,33 +202,50 @@ public class PooledSoundSystem extends SoundSystem {
             nextBL.set(false);
     }
 
-    private void tick0() {
-        boolean bl = nextBL.get();
-        nextBL.set(true);
-        if (!isResourceLoaded.get()) return;
-        ticks.incrementAndGet();
+    private synchronized void tick0() {
         try {
-            pool.evict();
-            pool.preparePool();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (!bl) {
-            for (TickableSoundInstance soundInstance : soundsToPlayNextTick)
-                play(soundInstance);
-            Iterator<Map.Entry<SoundInstance, Long>> iterator = this.startTicks.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<SoundInstance, Long> entry = iterator.next();
-                if (this.ticks.get() >= entry.getValue()) {
-                    SoundInstance sound = entry.getKey();
-                    if (sound instanceof TickableSoundInstance)
-                        ((TickableSoundInstance) sound).tick();
-                    this.play(sound);
-                    iterator.remove();
+            lastTickStart.set(System.nanoTime());
+            tickingStage.set("initial");
+            boolean bl = nextBL.get();
+            nextBL.set(true);
+            if (!isResourceLoaded.get()) return;
+            ticks.incrementAndGet();
+            try {
+                tickingStage.set("eviction");
+                pool.evict();
+                pool.preparePool();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            if (!bl) {
+                //noinspection SpellCheckingInspection
+                tickingStage.set("schedsound");
+                for (TickableSoundInstance soundInstance : soundsToPlayNextTick)
+                    play(soundInstance);
+                Iterator<Map.Entry<SoundInstance, Long>> iterator = this.startTicks.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<SoundInstance, Long> entry = iterator.next();
+                    if (this.ticks.get() >= entry.getValue()) {
+                        SoundInstance sound = entry.getKey();
+                        if (sound instanceof TickableSoundInstance)
+                            ((TickableSoundInstance) sound).tick();
+                        this.play(sound);
+                        iterator.remove();
+                    }
                 }
             }
+            //noinspection SpellCheckingInspection
+            tickingStage.set("subsystick");
+            soundSystemForEach(soundSystem -> soundSystem.tick(bl), false);
+        } catch (Throwable t) {
+            final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
+            chatHud.addMessage(new LiteralText("Error ticking SoundSystem: " + t.toString()));
+            chatHud.addMessage(new LiteralText("Current stage: " + tickingStage.get()));
+            throw t;
+        } finally {
+            tickingStage.set("");
+            lastTickTime.set(System.nanoTime() - lastTickStart.get());
         }
-        soundSystemForEach(soundSystem -> soundSystem.tick(bl), false);
     }
 
     @Override
@@ -342,6 +364,11 @@ public class PooledSoundSystem extends SoundSystem {
                 pool.getNumActive(), getPoolTotal(), pool.getMaxTotal()));
         list.add(String.format("SoundSystem executor size: %d/%d/%d",
                 internalExecutor.getActiveCount(), internalExecutor.getPoolSize(), internalExecutor.getMaximumPoolSize()));
+        list.add(String.format("SoundSystem last tick time: %.3fms", lastTickTime.get() / 1000.0 / 1000.0));
+        long tickingDuration = tickingStage.get().isEmpty() ? lastTickTime.get() : System.nanoTime() - lastTickStart.get();
+        list.add("SoundSystem ticker status: ");
+        list.add(String.format("Ticking stage: %10s", tickingStage.get().isEmpty() ? "Idle" : tickingStage.get()));
+        list.add(String.format("Ticking duration: %.3fms", tickingDuration / 1000.0 / 1000.0));
         return list;
     }
 

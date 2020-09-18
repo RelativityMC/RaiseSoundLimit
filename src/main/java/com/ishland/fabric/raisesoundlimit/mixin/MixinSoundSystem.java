@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Mixin(SoundSystem.class)
@@ -105,6 +106,7 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
 
     private static boolean isAltered = false;
     private final AtomicInteger failedCount = new AtomicInteger(0);
+    private final AtomicBoolean isScheduledRemoval = new AtomicBoolean(false);
 
     @Inject(
             method = "<init>",
@@ -189,7 +191,12 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
 
     @Override
     public boolean isValid() {
-        return this.started && failedCount.get() <= 8;
+        return this.started && failedCount.get() <= 8 && !isScheduledRemoval.get();
+    }
+
+    @Override
+    public void scheduleRemoval() {
+        isScheduledRemoval.set(true);
     }
 
     @Override

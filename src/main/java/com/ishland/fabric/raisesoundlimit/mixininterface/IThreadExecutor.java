@@ -6,4 +6,6 @@ public interface IThreadExecutor {
 
     CompletableFuture<Void> ISubmitAsync(Runnable runnable);
 
+    int getExecutionsInProgress();
+
 }

@@ -4,6 +4,7 @@ import com.ishland.fabric.raisesoundlimit.mixininterface.IThreadExecutor;
 import net.minecraft.util.thread.ThreadExecutor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -18,4 +19,8 @@ public abstract class MixinThreadExecutor implements IThreadExecutor {
     public CompletableFuture<Void> ISubmitAsync(Runnable runnable) {
         return this.submitAsync(runnable);
     }
+
+    @Accessor
+    @Override
+    public abstract int getExecutionsInProgress();
 }
