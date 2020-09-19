@@ -11,6 +11,4 @@ public interface ISoundSystem {
 
     boolean isValid();
 
-    void scheduleRemoval();
-
 }

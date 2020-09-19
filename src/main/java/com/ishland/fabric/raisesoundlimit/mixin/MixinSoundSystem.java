@@ -195,11 +195,6 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
     }
 
     @Override
-    public void scheduleRemoval() {
-        isScheduledRemoval.set(true);
-    }
-
-    @Override
     public int compareTo(SoundSystem soundSystem) {
         return ((ISoundEngine) ((ISoundSystem) soundSystem).getSoundEngine()).getUsages().get(0).getUsed() -
                 ((ISoundEngine) soundEngine).getUsages().get(0).getUsed();
