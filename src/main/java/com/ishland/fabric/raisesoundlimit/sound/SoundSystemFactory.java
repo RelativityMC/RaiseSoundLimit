@@ -95,7 +95,6 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
                 8,
                 TimeUnit.SECONDS
         );
-        ((ISoundSystem) p.getObject()).scheduleRemoval();
     }
 
     /**
