@@ -233,4 +233,16 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
         failedCount.set(0);
     }
 
+    @Redirect(
+            method = "play(Lnet/minecraft/client/sound/SoundInstance;)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ljava/util/concurrent/CompletableFuture;join()Ljava/lang/Object;"
+            )
+    )
+    public Object onSourceManagerJoin(CompletableFuture<Channel.SourceManager> completableFuture)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        return completableFuture.get(1, TimeUnit.SECONDS);
+    }
+
 }
