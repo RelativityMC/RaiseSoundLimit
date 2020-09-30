@@ -140,8 +140,8 @@ public class PooledSoundSystem extends SoundSystem {
                     final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
                     chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
                     chatHud.addMessage(new LiteralText(e.toString()));
-                    this.pool.setMaxTotal(getPoolTotal() * 2 / 3);
-                    this.pool.setMaxIdle(getPoolTotal() * 2 / 3);
+                    this.pool.setMaxTotal(Math.min(1, getPoolTotal() * 2 / 3));
+                    this.pool.setMaxIdle(Math.min(1, getPoolTotal() * 2 / 3));
                 }
             }
         });
@@ -154,6 +154,9 @@ public class PooledSoundSystem extends SoundSystem {
     @Override
     public void reloadSounds() {
         pool.clear();
+        pool.setMinIdle(Runtime.getRuntime().availableProcessors());
+        pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 16);
+        pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 16);
         try {
             pool.preparePool();
         } catch (Exception e) {
