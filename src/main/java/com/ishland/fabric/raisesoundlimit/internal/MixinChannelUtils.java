@@ -9,7 +9,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class MixinChannnelUtils {
+public class MixinChannelUtils {
     public static void tickImpl(Executor executor, Set<Channel.SourceManager> sources, AtomicInteger timeouts) {
         executor.execute(() -> {
             Iterator<Channel.SourceManager> iterator = sources.iterator();
@@ -32,7 +32,10 @@ public class MixinChannnelUtils {
                     sourceManager.close();
                     iterator.remove();
                     continue;
+                } catch (SourceNotTimeoutException e){
+                    timeouts.set(0);
                 }
+
                 if (source.isStopped()) {
                     sourceManager.close();
                     iterator.remove();

@@ -153,16 +153,13 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void reloadSounds() {
-        pool.clear();
-        pool.setMinIdle(Runtime.getRuntime().availableProcessors());
-        pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 16);
-        pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 16);
-        try {
-            pool.preparePool();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        isResourceLoaded.set(true);
+        internalExecutor.execute(() -> {
+            pool.clear();
+            pool.setMinIdle(Runtime.getRuntime().availableProcessors());
+            pool.setMaxIdle(Runtime.getRuntime().availableProcessors() * 16);
+            pool.setMaxTotal(Runtime.getRuntime().availableProcessors() * 16);
+            isResourceLoaded.set(true);
+        });
     }
 
     @Override
@@ -231,7 +228,7 @@ public class PooledSoundSystem extends SoundSystem {
                     if (this.ticks.get() >= entry.getValue()) {
                         SoundInstance sound = entry.getKey();
                         if (sound instanceof TickableSoundInstance)
-                            ((TickableSoundInstance) sound).tick();
+                            MinecraftClient.getInstance().execute(((TickableSoundInstance) sound)::tick);
                         this.play(sound);
                         iterator.remove();
                     }

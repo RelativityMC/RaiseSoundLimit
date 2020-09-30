@@ -24,7 +24,7 @@ public final class SoundSystemPriorityObjectPool extends GenericObjectPool<Sound
      */
     public SoundSystemPriorityObjectPool(PooledObjectFactory<SoundSystem> factory) {
         super(factory);
-        makePrioritized();
+        // makePrioritized();
     }
 
     private void makePrioritized() {

@@ -1,6 +1,6 @@
 package com.ishland.fabric.raisesoundlimit.mixin;
 
-import com.ishland.fabric.raisesoundlimit.internal.MixinChannnelUtils;
+import com.ishland.fabric.raisesoundlimit.internal.MixinChannelUtils;
 import net.minecraft.client.sound.Channel;
 import net.minecraft.client.sound.SoundEngine;
 import org.spongepowered.asm.mixin.Final;
@@ -10,8 +10,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,13 +47,19 @@ public class MixinChannel {
         });
     }
 
+    @Inject(method = "createSource", at = @At("HEAD"))
+    public void onCreateSource(SoundEngine.RunMode mode, CallbackInfoReturnable<CompletableFuture<Channel.SourceManager>> cir) {
+        if (timeouts.get() > 8)
+            cir.setReturnValue(CompletableFuture.completedFuture(null));
+    }
+
     /**
      * @author ishland
      * @reason handle tick
      */
     @Overwrite
     public void tick() {
-        MixinChannnelUtils.tickImpl(this.executor, this.sources, timeouts);
+        MixinChannelUtils.tickImpl(this.executor, this.sources, timeouts);
 
     }
 

@@ -2,11 +2,14 @@ package com.ishland.fabric.raisesoundlimit.mixininterface;
 
 import javax.sound.sampled.AudioFormat;
 import java.nio.ByteBuffer;
+import java.util.OptionalInt;
 
 public interface IStaticSound {
 
-    ByteBuffer getSample();
+    int getSampleSize();
 
     AudioFormat getFormat();
+
+    boolean hasBuffer();
 
 }
