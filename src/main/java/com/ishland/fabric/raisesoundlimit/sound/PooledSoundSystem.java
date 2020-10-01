@@ -220,8 +220,11 @@ public class PooledSoundSystem extends SoundSystem {
             if (!bl) {
                 //noinspection SpellCheckingInspection
                 tickingStage.set("schedsound");
-                for (TickableSoundInstance soundInstance : soundsToPlayNextTick)
+                for (Iterator<TickableSoundInstance> iterator = soundsToPlayNextTick.iterator(); iterator.hasNext(); ) {
+                    TickableSoundInstance soundInstance = iterator.next();
                     play(soundInstance);
+                    iterator.remove();
+                }
                 Iterator<Map.Entry<SoundInstance, Long>> iterator = this.startTicks.entrySet().iterator();
                 while (iterator.hasNext()) {
                     Map.Entry<SoundInstance, Long> entry = iterator.next();
