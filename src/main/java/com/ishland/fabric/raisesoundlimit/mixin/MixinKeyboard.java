@@ -32,12 +32,6 @@ public class MixinKeyboard {
                 cir.setReturnValue(true);
                 return;
             }
-            if (key == 88) {
-                ((ISoundManager) MinecraftClient.getInstance().getSoundManager())
-                        .getSoundSystem().killStuckExecutorThreads();
-                cir.setReturnValue(true);
-                return;
-            }
         } else {
             if (key == 81) {
                 final ChatHud chatHud = this.client.inGameHud.getChatHud();

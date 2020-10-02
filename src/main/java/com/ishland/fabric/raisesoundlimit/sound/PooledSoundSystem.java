@@ -419,63 +419,6 @@ public class PooledSoundSystem extends SoundSystem {
         return systems;
     }
 
-    public void killStuckExecutorThreads() {
-        new Thread(() -> {
-            final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
-            chatHud.addMessage(new LiteralText("Searching for currently \"stuck\" threads"));
-            List<Thread> possibleStuckThreads = new LinkedList<>();
-            for (Thread thread : internalExecutorThreads) {
-                if (thread.isAlive()) {
-                    if (thread.getState() == Thread.State.BLOCKED ||
-                            thread.getState() == Thread.State.TIMED_WAITING ||
-                            thread.getState() == Thread.State.WAITING) {
-                        possibleStuckThreads.add(thread);
-                    }
-                }
-            }
-            chatHud.addMessage(new LiteralText(
-                    String.format("Found %d threads, waiting for 3s...", possibleStuckThreads.size())));
-            try {
-                Thread.sleep(3000);
-            } catch (InterruptedException ignored) {
-            }
-            for (Iterator<Thread> iterator = possibleStuckThreads.iterator(); iterator.hasNext(); ) {
-                Thread thread = iterator.next();
-                if (thread.isAlive()) {
-                    if (thread.getState() == Thread.State.BLOCKED ||
-                            thread.getState() == Thread.State.TIMED_WAITING ||
-                            thread.getState() == Thread.State.WAITING) {
-                        chatHud.addMessage(new LiteralText(
-                                String.format("Interrupting %s...", thread.getName())));
-                        thread.interrupt();
-                    } else
-                        iterator.remove();
-                }
-            }
-            chatHud.addMessage(new LiteralText(
-                    String.format("Interrupted %d threads, waiting for 3s...", possibleStuckThreads.size())));
-            try {
-                Thread.sleep(3000);
-            } catch (InterruptedException ignored) {
-            }
-            for (Iterator<Thread> iterator = possibleStuckThreads.iterator(); iterator.hasNext(); ) {
-                Thread thread = iterator.next();
-                if (thread.isAlive()) {
-                    if (thread.getState() == Thread.State.BLOCKED ||
-                            thread.getState() == Thread.State.TIMED_WAITING ||
-                            thread.getState() == Thread.State.WAITING) {
-                        chatHud.addMessage(new LiteralText(
-                                String.format("Killing %s...", thread.getName())));
-                        thread.stop();
-                    } else
-                        iterator.remove();
-                }
-            }
-            chatHud.addMessage(new LiteralText(
-                    String.format("Killed %d threads", possibleStuckThreads.size())));
-        }).start();
-    }
-
     private static final class BreakException extends RuntimeException {
 
     }
