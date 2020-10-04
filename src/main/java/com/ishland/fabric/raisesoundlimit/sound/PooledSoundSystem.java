@@ -92,6 +92,7 @@ public class PooledSoundSystem extends SoundSystem {
     private final AtomicReference<String> tickingStage = new AtomicReference<>("");
 
     final AtomicLong ticks = new AtomicLong(0L);
+    final AtomicLong lastShrinkTicks = new AtomicLong(0L);
 
     public PooledSoundSystem(SoundManager loader, GameOptions settings, ResourceManager resourceManager) throws Exception {
         super(loader, settings, resourceManager);
@@ -140,8 +141,12 @@ public class PooledSoundSystem extends SoundSystem {
                     final ChatHud chatHud = MinecraftClient.getInstance().inGameHud.getChatHud();
                     chatHud.addMessage(new LiteralText("Unable to extend sound system: "));
                     chatHud.addMessage(new LiteralText(e.toString()));
-                    this.pool.setMaxTotal(Math.min(1, getPoolTotal() * 2 / 3));
-                    this.pool.setMaxIdle(Math.min(1, getPoolTotal() * 2 / 3));
+                    if (lastShrinkTicks.get() + 30 * 20 < ticks.get()) {
+                        lastShrinkTicks.set(ticks.get());
+                        this.pool.setMaxTotal(Math.min(1, getPoolTotal() * 2 / 3));
+                        this.pool.setMaxIdle(Math.min(1, getPoolTotal() * 2 / 3));
+                        this.pool.clear();
+                    }
                 }
             }
         });
