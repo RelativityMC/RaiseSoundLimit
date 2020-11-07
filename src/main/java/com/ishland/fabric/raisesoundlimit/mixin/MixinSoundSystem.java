@@ -45,7 +45,7 @@ public abstract class MixinSoundSystem implements ISoundSystem, Comparable<Sound
 
     @Shadow
     @Final
-    private Listener listener;
+    private SoundListener listener;
 
     @Shadow
     @Final
