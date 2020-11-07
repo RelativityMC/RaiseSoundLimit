@@ -27,13 +27,11 @@ public abstract class MixinSoundManager implements ISoundManager {
             method = "<init>",
             at = @At(
                     value = "RETURN"
-            ),
-            cancellable = true
+            )
     )
     public void onPostInit(ResourceManager resourceManager, GameOptions gameOptions, CallbackInfo ci) throws Exception {
         MixinUtils.logger.info("Initializing PooledSoundSystem");
         soundSystem = new PooledSoundSystem(SoundManager.class.cast(this), gameOptions, resourceManager);
-        ci.cancel();
     }
 
     @Override
