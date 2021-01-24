@@ -20,6 +20,8 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
     private final ResourceManager resourceManager;
     private final PooledSoundSystem pooledSoundSystem;
 
+    volatile boolean isShuttingDown = false;
+
     SoundSystemFactory(SoundManager loader,
                        GameOptions settings,
                        ResourceManager resourceManager,
@@ -84,17 +86,19 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
      */
     @Override
     public void destroyObject(PooledObject<SoundSystem> p) throws Exception {
-        pooledSoundSystem.internalScheduledExecutor.schedule(
-                () -> {
-                    try {
-                        p.getObject().stop();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                    }
-                },
-                8,
-                TimeUnit.SECONDS
-        );
+        if (!isShuttingDown)
+            pooledSoundSystem.internalScheduledExecutor.schedule(
+                    () -> {
+                        try {
+                            p.getObject().stop();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                        }
+                    },
+                    1,
+                    TimeUnit.SECONDS
+            );
+        else p.getObject().stop();
     }
 
     /**

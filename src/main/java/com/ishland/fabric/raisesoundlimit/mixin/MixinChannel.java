@@ -2,7 +2,6 @@ package com.ishland.fabric.raisesoundlimit.mixin;
 
 import com.ishland.fabric.raisesoundlimit.internal.MixinChannelUtils;
 import net.minecraft.client.sound.Channel;
-import net.minecraft.client.sound.SoundEngine;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -31,7 +30,7 @@ public class MixinChannel {
     private AtomicInteger timeouts = new AtomicInteger(0);
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    public void onInit(SoundEngine soundEngine, Executor executor, CallbackInfo ci) {
+    public void onInit(CallbackInfo ci) {
         timeouts = new AtomicInteger(0);
     }
 
@@ -47,8 +46,8 @@ public class MixinChannel {
         });
     }
 
-    @Inject(method = "createSource", at = @At("HEAD"))
-    public void onCreateSource(SoundEngine.RunMode mode, CallbackInfoReturnable<CompletableFuture<Channel.SourceManager>> cir) {
+    @Inject(method = "createSource", at = @At("HEAD"), cancellable = true)
+    public void onCreateSource(CallbackInfoReturnable<CompletableFuture<Channel.SourceManager>> cir) {
         if (timeouts.get() > 8)
             cir.setReturnValue(CompletableFuture.completedFuture(null));
     }

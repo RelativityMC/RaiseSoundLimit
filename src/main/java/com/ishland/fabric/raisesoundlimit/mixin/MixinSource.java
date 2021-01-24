@@ -4,13 +4,11 @@ import com.google.common.util.concurrent.AtomicDouble;
 import com.ishland.fabric.raisesoundlimit.internal.SourceNotTimeoutException;
 import com.ishland.fabric.raisesoundlimit.internal.SourceTimeoutException;
 import com.ishland.fabric.raisesoundlimit.mixininterface.IStaticSound;
-import jdk.internal.jline.internal.Nullable;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.sound.AudioStream;
 import net.minecraft.client.sound.Source;
 import net.minecraft.client.sound.StaticSound;
-import net.minecraft.text.LiteralText;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL10;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -111,11 +109,6 @@ public abstract class MixinSource {
                     (System.currentTimeMillis() - startTime.get()) / pitch.get()
                             > (lengthMS.get() + 3000)) {
                 timeout.set(true);
-                try {
-                    MinecraftClient.getInstance().inGameHud.setOverlayMessage(
-                            new LiteralText("Source playing timeout, " + (System.currentTimeMillis() - startTime.get()) / pitch.get() + "/" + (lengthMS.get() + 3000) + "ms"), false);
-                } catch (Throwable ignored){
-                }
                 throw new SourceTimeoutException("Source playing timed out");
             }
             if(isStopped())

@@ -3,6 +3,7 @@ package com.ishland.fabric.raisesoundlimit.sound;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.ishland.fabric.raisesoundlimit.FabricLoader;
 import com.ishland.fabric.raisesoundlimit.MixinUtils;
 import com.ishland.fabric.raisesoundlimit.internal.SoundHandleCreationFailedException;
@@ -48,7 +49,7 @@ public class PooledSoundSystem extends SoundSystem {
     // Executors and pools
     private final GenericObjectPool<SoundSystem> pool;
     private final Set<Thread> internalExecutorThreads = Sets.newConcurrentHashSet();
-    final ThreadPoolExecutor internalExecutor =
+    private final ThreadPoolExecutor internalExecutor =
             (ThreadPoolExecutor) Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors(), 1),
                     new ThreadFactory() {
                         private final AtomicLong serial = new AtomicLong(0);
@@ -57,11 +58,13 @@ public class PooledSoundSystem extends SoundSystem {
                         public Thread newThread(Runnable runnable) {
                             final Thread thread = new Thread(runnable);
                             thread.setName("RSLExec-" + serial.incrementAndGet());
-                            thread.setPriority(4);
+                            thread.setPriority(Thread.NORM_PRIORITY - 1);
                             internalExecutorThreads.add(thread);
                             return thread;
                         }
                     });
+    private final ExecutorService constructingExecutor = Executors.newSingleThreadExecutor(
+            new ThreadFactoryBuilder().setPriority(Thread.NORM_PRIORITY - 1).setDaemon(true).build());
     final ScheduledExecutorService internalScheduledExecutor =
             Executors.newSingleThreadScheduledExecutor(
                     new ThreadFactory() {
@@ -72,7 +75,7 @@ public class PooledSoundSystem extends SoundSystem {
                             final Thread thread = new Thread(runnable);
                             thread.setName("RSLSExec-"
                                     + serial.incrementAndGet());
-                            thread.setPriority(4);
+                            thread.setPriority(Thread.NORM_PRIORITY - 1);
                             internalExecutorThreads.add(thread);
                             return thread;
                         }
@@ -127,7 +130,7 @@ public class PooledSoundSystem extends SoundSystem {
     }
 
     public void tryExtendSize() {
-        internalExecutor.execute(() -> {
+        constructingExecutor.execute(() -> {
             if (getPoolTotal() < pool.getMaxTotal()) {
                 FabricLoader.logger.info("Extending size of sound system");
                 MinecraftClient.getInstance().execute(() ->
@@ -176,9 +179,17 @@ public class PooledSoundSystem extends SoundSystem {
 
     @Override
     public void stop() {
-        internalScheduledExecutor.shutdown();
+        ((SoundSystemFactory) pool.getFactory()).isShuttingDown = true;
         pool.close();
         internalExecutor.shutdown();
+        internalScheduledExecutor.shutdown();
+        while (!internalExecutor.isTerminated() || !internalScheduledExecutor.isTerminated()) {
+            try {
+                internalExecutor.awaitTermination(1, TimeUnit.SECONDS);
+                internalScheduledExecutor.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+            }
+        }
     }
 
     @Override
@@ -219,8 +230,16 @@ public class PooledSoundSystem extends SoundSystem {
             ticks.incrementAndGet();
             try {
                 tickingStage.set("eviction");
-                pool.evict();
-                pool.preparePool();
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        pool.evict();
+                    } catch (Exception e) {
+                    }
+                    try {
+                        pool.preparePool();
+                    } catch (Exception e) {
+                    }
+                }, constructingExecutor).join();
             } catch (Exception e) {
                 e.printStackTrace();
             }
