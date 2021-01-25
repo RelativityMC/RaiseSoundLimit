@@ -11,8 +11,6 @@ import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 
-import java.util.concurrent.TimeUnit;
-
 class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
 
     private final SoundManager loader;
@@ -86,19 +84,8 @@ class SoundSystemFactory extends BasePooledObjectFactory<SoundSystem> {
      */
     @Override
     public void destroyObject(PooledObject<SoundSystem> p) throws Exception {
-        if (!isShuttingDown)
-            pooledSoundSystem.internalScheduledExecutor.schedule(
-                    () -> {
-                        try {
-                            p.getObject().stop();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                        }
-                    },
-                    1,
-                    TimeUnit.SECONDS
-            );
-        else p.getObject().stop();
+        p.getObject().stopAll();
+        p.getObject().stop();
     }
 
     /**

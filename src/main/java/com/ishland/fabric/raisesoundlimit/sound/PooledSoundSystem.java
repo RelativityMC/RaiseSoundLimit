@@ -85,6 +85,7 @@ public class PooledSoundSystem extends SoundSystem {
     private String debugString = calculatingDebugString;
     private final AtomicBoolean isResourceLoaded = new AtomicBoolean(false);
     private final AtomicBoolean nextBL = new AtomicBoolean(false);
+    private final AtomicReference<CompletableFuture<Void>> lastEviction = new AtomicReference<>(CompletableFuture.completedFuture(null));
 
     final List<SoundInstanceListener> listeners = Lists.newArrayList();
     final List<TickableSoundInstance> soundsToPlayNextTick = Lists.newArrayList();
@@ -229,17 +230,17 @@ public class PooledSoundSystem extends SoundSystem {
             if (!isResourceLoaded.get()) return;
             ticks.incrementAndGet();
             try {
-                tickingStage.set("eviction");
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        pool.evict();
-                    } catch (Exception e) {
-                    }
-                    try {
-                        pool.preparePool();
-                    } catch (Exception e) {
-                    }
-                }, constructingExecutor).join();
+                if (lastEviction.get().isDone())
+                    lastEviction.set(CompletableFuture.runAsync(() -> {
+                        try {
+                            pool.evict();
+                        } catch (Exception ignored) {
+                        }
+                        try {
+                            pool.preparePool();
+                        } catch (Exception ignored) {
+                        }
+                    }, constructingExecutor));
             } catch (Exception e) {
                 e.printStackTrace();
             }
